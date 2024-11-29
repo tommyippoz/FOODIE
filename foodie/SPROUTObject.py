@@ -15,7 +15,7 @@ from foodie.UncertaintyCalculator import EntropyUncertainty, ConfidenceInterval,
 from foodie.classifiers.Classifier import get_classifier_name
 from foodie.utils import general_utils
 from foodie.utils.general_utils import get_full_class_name, current_ms
-from foodie.utils.sprout_utils import read_adjudicator_calculators, compute_omission_metrics, train_binary_adjudicator
+from foodie.utils.foodie_utils import read_adjudicator_calculators, compute_omission_metrics, train_binary_adjudicator
 
 
 def exercise_wrapper(model_data, models_folder: str, classifier, x_train, y_train,

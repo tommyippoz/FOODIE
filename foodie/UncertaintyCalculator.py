@@ -19,7 +19,7 @@ from tqdm import tqdm
 from foodie.classifiers.AutoEncoder import DeepAutoEncoder, SingleAutoEncoder, SingleSparseAutoEncoder
 from foodie.classifiers.Classifier import get_classifier_name
 from foodie.utils.general_utils import current_ms, get_full_class_name
-from foodie.utils.sprout_utils import predictions_variability
+from foodie.utils.foodie_utils import predictions_variability
 
 
 class UncertaintyCalculator:

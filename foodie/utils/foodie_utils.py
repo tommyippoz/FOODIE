@@ -13,44 +13,8 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
-from foodie.classifiers.Classifier import get_classifier_name
+from foodie.utils.classifier_utils import get_classifier_name
 from foodie.utils.general_utils import current_ms
-
-
-def build_SPROUT_dataset(x_test, y_proba, y_pred, y_test, label_tags) -> pandas.DataFrame:
-    """
-    Prepares DataFrame to output SPROUT results
-    :param y_proba: probabilities assigned by the classifier
-    :param y_pred: predictions (classes) of the classifier
-    :param y_test: labels of the test set (ground truth)
-    :param label_tags: Names of the classes
-    :return: a DataFrame with 4 columns
-    """
-    out_df = x_test.copy()
-    out_df.reset_index(drop=True, inplace=True)
-    out_df['true_label'] = list(map(lambda x: label_tags[x], y_test))
-    out_df['predicted_label'] = list(map(lambda x: label_tags[x], y_pred))
-    out_df['is_misclassification'] = np.where(out_df['true_label'] != out_df['predicted_label'], 1, 0)
-    out_df['probabilities'] = [np.array2string(y_proba[i], separator=";") for i in range(len(y_proba))]
-    return out_df
-
-
-def read_adjudicator_calculators(model_folder: str) -> dict:
-    """
-    Reads Uncertainty measures associated to a specific adjudicator to load
-    :param model_folder: folder where the adjudicator was saved
-    :return: a dictionary
-    """
-    uc_dict = {}
-    if os.path.exists(model_folder + "uncertainty_calculator_params.csv"):
-        with open(model_folder + "uncertainty_calculator_params.csv") as csvfile:
-            my_reader = csv.reader(csvfile, delimiter=',')
-            next(my_reader, None)
-            for row in my_reader:
-                if row[0] not in uc_dict:
-                    uc_dict[row[0].strip()] = {}
-                uc_dict[row[0].strip()][row[1].strip()] = row[2].strip()
-    return uc_dict
 
 
 def predictions_variability(predictions: numpy.ndarray):
