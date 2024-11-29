@@ -1,2 +1,2 @@
 # FOODIE
-Reporitory for orchestrating Fail cOntrOlleD classIfiErs
+Repository for orchestrating Fail cOntrOlleD classIfiErs
