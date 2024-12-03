@@ -1,8 +1,15 @@
 import csv
 import os
+import warnings
 
-from foodie.classifiers.Classifier import get_classifier_name
+from pyod.models.copod import COPOD
+from pyod.models.pca import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from xgboost import XGBClassifier
+
+from foodie.classifiers.Classifier import get_classifier_name, Classifier
 from foodie.dataloader.TabularDataLoader import SingleTabularDataLoader
+from foodie.utils.classifier_utils import evaluate_classifier
 from foodie.utils.general_utils import is_csv_file, current_ms
 
 # Paths
@@ -15,16 +22,39 @@ LABEL_NAME = 'multilabel'
 ROW_LIMIT = None
 TT_SPLIT = 0.5
 TV_SPLIT = None
-LABEL_ENCODING = False
-SHUFFLE = False
-NORMAL_TAG = None
+LABEL_ENCODING = True
+SHUFFLE = True
+NORMAL_TAG = "normal"
 REMOVE_CATEGORICAL = True
-FEATURES_TO_REMOVE = None
+FEATURES_TO_REMOVE = ['timestamp', 'time', 'ip', 'src_ip', 'dst_ip', 'port', 'src_port', 'dst_port']
 
 
-# Builds classifiers to be tested
-def get_test_classifiers() -> list:
-    return []
+def get_test_classifiers(contamination: float) -> list:
+    """
+    Gets classifiers to be tested as a list
+    :param contamination: a float value indicating the fractio of anomalies in the train/val set, needed for PYOD
+    :return: a list of classifiers
+    """
+    classifiers = [
+        LinearDiscriminantAnalysis(),
+        Classifier(clf=LinearDiscriminantAnalysis()),
+        Classifier(clf=LinearDiscriminantAnalysis(), calibrator_str='platt'),
+        Classifier(clf=LinearDiscriminantAnalysis(), calibrator_str='isotonic'),
+        XGBClassifier(n_estimators=10),
+        Classifier(clf=XGBClassifier(n_estimators=10)),
+        Classifier(clf=XGBClassifier(n_estimators=10), calibrator_str='platt'),
+        Classifier(clf=XGBClassifier(n_estimators=10), calibrator_str='isotonic')
+    ]
+    if contamination > 0:
+        if contamination > 0.5:
+            contamination = 0.5
+            print("Warning: amount of anomalies in the dataset is bigger than 50%")
+        classifiers.extend([Classifier(COPOD(contamination=contamination)),
+                            COPOD(contamination=contamination),
+                            Classifier(PCA(contamination=contamination)),
+                            PCA(contamination=contamination)
+                            ])
+    return classifiers
 
 
 if __name__ == '__main__':
@@ -47,7 +77,7 @@ if __name__ == '__main__':
         dataset_path = os.path.join(DATA_FOLDER, filename)
         if os.path.isfile(dataset_path) and is_csv_file(dataset_path):
 
-            print("Processing Dataset '%s'", dataset_path)
+            print("Processing Dataset '%s'" % dataset_path)
             data_loader = SingleTabularDataLoader(tab_filename=dataset_path, label_name=LABEL_NAME,
                                                   data_limit=ROW_LIMIT, remove_categorical=REMOVE_CATEGORICAL,
                                                   remove_columns=FEATURES_TO_REMOVE,
@@ -61,19 +91,23 @@ if __name__ == '__main__':
             x_test, y_test = data_loader.get_test_data()
 
             # Iterating over classifiers
-            for clf in get_test_classifiers():
+            for clf in get_test_classifiers(data_loader.get_contamination()):
                 clf_name = get_classifier_name(clf)
-                print("\nBuilding classifier: %s", clf_name)
                 start_ms = current_ms()
-                clf.fit(x_train, y_train)
+                with warnings.catch_warnings():
+                    # This is to avoid prompting the PYOD warning "y should not be presented in unsupervised learn.."
+                    warnings.simplefilter("ignore")
+                    clf.fit(x_train, y_train)
                 train_ms = current_ms()
                 y_pred = clf.predict(x_test)
-                test_ms = current_ms() - train_ms
-                metrics = evaluate_classifier(classifier=clf, x_test=x_test, y_test=y_test, print_summary=True)
-                metrics["train_ms"] = train_ms
-                metrics["test_ms"] = test_ms
+                test_time = current_ms() - train_ms
+                metrics = evaluate_classifier(classifier=clf, x_test=x_test, y_test=y_test)
+                metrics["train_ms"] = train_ms - start_ms
+                metrics["test_ms"] = test_time
                 metrics["clf_name"] = clf_name
                 metrics["dataset_name"] = filename
+                print("\tClassifier '%s' has accuracy of %.3f, train/test in %d/%d milliseconds" %
+                      (clf_name, metrics["acc"], metrics["train_ms"], metrics["test_ms"]))
 
                 # Write to CSV
                 with open(OUT_FILE, 'a', newline='') as file:

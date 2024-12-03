@@ -59,6 +59,21 @@ class DataLoader:
         """
         return len(self.get_unique_labels())
 
+    def get_contamination(self) -> float:
+        """
+        Returns the percentage of anomalies in the train set (if labeled) or validation (if any)
+        :return: the contamination value
+        """
+        if self.normal_tag is not None:
+            if self.y_train is not None:
+                return 1 - (self.y_train == self.normal_tag).sum()/len(self.y_train)
+            elif self.y_val is not None:
+                return 1 - (self.y_val == self.normal_tag).sum() / len(self.y_val)
+            else:
+                return 0.0
+        else:
+            return 0.0
+
     # ------------------------ TO BE OVERRIDDEN --------------------------------
 
     def load_data(self) -> None:

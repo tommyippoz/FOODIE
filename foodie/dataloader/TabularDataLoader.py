@@ -81,9 +81,11 @@ class SingleTabularDataLoader(TabularDataLoader):
 
             # Checks if label has to be encoded
             if self.label_encoding:
-                encoding = pandas.factorize(df[self.label_name])
-                y = numpy.asarray(encoding[0])
-                self.label_names = encoding[1]
+                encoding, mapping = pandas.factorize(df[self.label_name])
+                self.normal_tag = list(mapping).index(self.normal_tag)
+                y = numpy.asarray(encoding)
+                self.label_names = list(mapping)
+
             else:
                 y = df[self.label_name].to_numpy()
                 self.label_names = numpy.unique(y)
@@ -91,7 +93,7 @@ class SingleTabularDataLoader(TabularDataLoader):
             print("Dataset loaded: " + str(len(df.index)) + " items and " + str(len(self.label_names)) + " labels")
             x = df.drop(columns=[self.label_name])
         else:
-            print("Unable to find label column '%s'", self.label_name)
+            print("Unable to find label column '%s'" % self.label_name)
             x = df
             y = None
 
