@@ -3,8 +3,13 @@ import os
 import warnings
 
 from pyod.models.copod import COPOD
+from pyod.models.iforest import IForest
 from pyod.models.pca import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, ExtraTreesClassifier, \
+    BaggingClassifier, StackingClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
 
 from foodie.classifiers.Classifier import get_classifier_name, Classifier
@@ -35,24 +40,28 @@ def get_test_classifiers(contamination: float) -> list:
     :param contamination: a float value indicating the fractio of anomalies in the train/val set, needed for PYOD
     :return: a list of classifiers
     """
-    classifiers = [
-        LinearDiscriminantAnalysis(),
-        Classifier(clf=LinearDiscriminantAnalysis()),
-        Classifier(clf=LinearDiscriminantAnalysis(), calibrator_str='platt'),
-        Classifier(clf=LinearDiscriminantAnalysis(), calibrator_str='isotonic'),
-        XGBClassifier(n_estimators=10),
-        Classifier(clf=XGBClassifier(n_estimators=10)),
-        Classifier(clf=XGBClassifier(n_estimators=10), calibrator_str='platt'),
-        Classifier(clf=XGBClassifier(n_estimators=10), calibrator_str='isotonic')
-    ]
+    classifiers = [RandomForestClassifier(n_estimators=10),
+                   Classifier(RandomForestClassifier(n_estimators=10)),
+                   GradientBoostingClassifier(n_estimators=10),
+                   ExtraTreesClassifier(n_estimators=10),
+                   BaggingClassifier(n_estimators=10, base_estimator=GaussianNB()),
+                   StackingClassifier(estimators=[('lda', LinearDiscriminantAnalysis()), ('gnb', GaussianNB())],
+                                      final_estimator=DecisionTreeClassifier()),
+                   Classifier(clf=LinearDiscriminantAnalysis()),
+                   Classifier(clf=LinearDiscriminantAnalysis(), calibrator_str='platt'),
+                   Classifier(clf=LinearDiscriminantAnalysis(), calibrator_str='isotonic'),
+                   Classifier(clf=XGBClassifier(n_estimators=10)),
+                   Classifier(clf=XGBClassifier(n_estimators=10), calibrator_str='platt'),
+                   Classifier(clf=XGBClassifier(n_estimators=10), calibrator_str='isotonic')
+                   ]
     if contamination > 0:
         if contamination > 0.5:
             contamination = 0.5
             print("Warning: amount of anomalies in the dataset is bigger than 50%")
         classifiers.extend([Classifier(COPOD(contamination=contamination)),
                             COPOD(contamination=contamination),
-                            Classifier(PCA(contamination=contamination)),
-                            PCA(contamination=contamination)
+                            Classifier(IForest(contamination=contamination, n_estimators=10)),
+                            IForest(contamination=contamination, n_estimators=10)
                             ])
     return classifiers
 
@@ -101,7 +110,7 @@ if __name__ == '__main__':
                 train_ms = current_ms()
                 y_pred = clf.predict(x_test)
                 test_time = current_ms() - train_ms
-                metrics = evaluate_classifier(classifier=clf, x_test=x_test, y_test=y_test)
+                metrics = evaluate_classifier(classifier=clf, x_test=x_test, y_test=y_test, label_tags=data_loader.label_names)
                 metrics["train_ms"] = train_ms - start_ms
                 metrics["test_ms"] = test_time
                 metrics["clf_name"] = clf_name
